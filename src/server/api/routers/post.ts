@@ -18,19 +18,34 @@ export const postRouter = createTRPCRouter({
     }),
 
   create: protectedProcedure
-    .input(z.object({ name: z.string().min(1) }))
+    .input(
+      z.object({ name: z.string().min(1), description: z.string().min(1) }),
+    )
     .mutation(async ({ ctx, input }) => {
-      // simulate a slow db call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      throw new Error("ERROR NE ANH LJALKSJDLKAJWDLAKJD");
+      const call = async () => {
+        // simulate a slow db call
+        await new Promise((resolve) => setTimeout(resolve, 7000));
 
-      await ctx.db.insert(posts).values({
-        name: input.name,
-        createdById: ctx.session.user.id,
-      });
+        await ctx.db.insert(posts).values({
+          name: input.name,
+          description: input.description,
+          createdById: ctx.session.user.id,
+        });
+      };
+
+      console.log("fm calling create post");
+      return call();
+      // const { time, error, result } = await serverLogger.logPerformance(
+      //   "create post",
+      //   call(),
+      // );
+      // console.log("fm time", time, error, result);
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      throw new Error("ERROR NE ANH EM qweqwe");
       await ctx.db.delete(posts).where(eq(posts.id, input.id));
     }),
 
@@ -44,6 +59,13 @@ export const postRouter = createTRPCRouter({
     return ctx.db.query.posts.findMany();
   }),
 
+  getPostDetails: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ ctx, input }) => {
+      return ctx.db.query.posts.findFirst({
+        where: (post, { eq }) => eq(post.id, input.id),
+      });
+    }),
   getSecretMessage: protectedProcedure.query(() => {
     return "you can now see this secret message!";
   }),

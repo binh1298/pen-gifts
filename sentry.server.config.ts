@@ -4,15 +4,22 @@
 
 import * as Sentry from "@sentry/nextjs";
 
+console.log(
+  "fm sentry dsn server",
+  process.env.NEXT_RUNTIME,
+  process.env.NEXT_PUBLIC_SENTRY_DSN,
+);
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  environment: process.env.NODE_ENV,
+  environment: process.env.NEXT_PUBLIC_ENV,
+  // allowUrls: [process.env.SENTRY_ALLOW_URLS ?? "http://localhost:3000"],
+  release: process.env.NEXT_PUBLIC_ASSETS_CDN_VERSION ?? "local",
 
   // Adjust this value in production, or use tracesSampler for greater control
   tracesSampleRate: 1,
 
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
-  debug: false,
+  // debug: process.env.NEXT_PUBLIC_ENV === "development",
 
   // Uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: process.env.NODE_ENV === 'development',

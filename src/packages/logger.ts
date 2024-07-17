@@ -5,12 +5,18 @@ function getLogLevel(logLevel: LogLevelParam): LogLevelType {
 }
 
 // Core
-export type StdLogFunction = (...params: unknown[]) => void;
-export type StdPerformanceResult = {
-  time: number;
-  result?: unknown;
-  error?: unknown;
+export type StdPluginLogParams<TGlobalExtras> = {
+  appVersion: string;
+  loglevel: keyof typeof LOG_LEVEL;
+  globalExtras: TGlobalExtras;
+  exception?: unknown;
+  params: unknown[];
 };
+
+export type StdLogFunction = (...params: unknown[]) => void;
+export type StdPluginLogFunction<TGlobalExtras> = (
+  params: StdPluginLogParams<TGlobalExtras>,
+) => void;
 
 export interface StdInterface {
   debug: StdLogFunction;
@@ -19,98 +25,139 @@ export interface StdInterface {
   error: StdLogFunction;
 }
 
-export type LoggerPlugin = {
-  debug?: StdLogFunction;
-  log?: StdLogFunction;
-  warn?: StdLogFunction;
-  error?: StdLogFunction;
-  logPerformance?: (name: string, promise: Promise<unknown>) => Promise<void>;
+export type LoggerPlugin<TUser, TGlobalExtras> = {
+  debug?: StdPluginLogFunction<TGlobalExtras>;
+  log?: StdPluginLogFunction<TGlobalExtras>;
+  warn?: StdPluginLogFunction<TGlobalExtras>;
+  error?: StdPluginLogFunction<TGlobalExtras>;
+  setUser?: (user: TUser | null) => void;
+  setGlobalExtras?: (extras: TGlobalExtras | null) => void;
+  setTags?: (tags: Record<string, string>) => void;
 };
 
 export const LOG_LEVEL = {
-  DEBUG: 0, // Use case: Log form states
-  LOG: 1, // Use case: Log API params and responses
-  WARN: 2, // Use case: Log non-critical unexpected behavior such as MUI / Antd issues
-  ERROR: 3, // Use case: nextjs global-error.tsx | error.tsx | API response error
+  debug: 0, // Use case: Log form states
+  log: 1, // Use case: Log API params and responses
+  warning: 2, // Use case: Log non-critical unexpected behavior such as MUI / Antd issues
+  error: 3, // Use case: nextjs global-error.tsx | error.tsx | API response error
 } as const;
 type LogLevelType = (typeof LOG_LEVEL)[keyof typeof LOG_LEVEL];
 
-const defaultFormatLog = (
-  appVersion: string,
-  prefix: string,
-  loglevel: keyof typeof LOG_LEVEL,
-  params: unknown[],
-) => [`[${prefix}] [${appVersion}] [${loglevel}]:`, ...params];
+const defaultFormatLog = <TGlobalExtras>(
+  params: StdPluginLogParams<TGlobalExtras>,
+) => params;
 
-export const createVngLogger = ({
+export const createVngLogger = <TUser, TGlobalExtras>({
   appVersion,
-  stdOut,
+  stdOut: inputStdOut,
   logLevel: inputLogLevel,
   plugins = [],
-  prefix = "",
   formatLog = defaultFormatLog,
+  globalExtras,
 }: {
   appVersion: string;
   stdOut: StdInterface;
-  plugins: LoggerPlugin[];
+  plugins: LoggerPlugin<TUser, TGlobalExtras>[];
   logLevel: LogLevelParam;
-  prefix: string;
+  globalExtras: TGlobalExtras;
   formatLog?: typeof defaultFormatLog;
 }) => {
-  let logLevel: LogLevelType = getLogLevel(inputLogLevel) || LOG_LEVEL.DEBUG;
+  let logLevel: LogLevelType = getLogLevel(inputLogLevel) || LOG_LEVEL.debug;
+  let user: TUser | null = null;
+  let extras: TGlobalExtras = globalExtras;
+  let stdOut: StdInterface = inputStdOut;
+  if (extras) {
+    plugins.forEach((plugin) => {
+      plugin.setGlobalExtras?.(extras);
+    });
+  }
 
-  const logBasedOnLevel = (
-    logFunction: keyof StdInterface,
-    level: keyof typeof LOG_LEVEL,
-    params: unknown[],
-  ) => {
-    console.log("logLevel", logLevel, level, params);
+  const logBasedOnLevel = ({
+    logFunction,
+    level,
+    params,
+    exception,
+  }: {
+    logFunction: keyof StdInterface;
+    level: keyof typeof LOG_LEVEL;
+    params: unknown[];
+    exception?: StdPluginLogParams<TGlobalExtras>["exception"];
+  }) => {
     if (logLevel > LOG_LEVEL[level]) return;
 
-    const formattedMsg = formatLog(appVersion, prefix, level, params);
-    console.log("fm msg", formattedMsg);
+    const message = {
+      appVersion,
+      loglevel: level,
+      globalExtras,
+      params,
+      exception,
+    };
 
     plugins.forEach((plugin) => {
-      plugin[logFunction]?.(...formattedMsg);
+      plugin[logFunction]?.(message);
     });
-    return stdOut[logFunction](...params);
+
+    return stdOut[logFunction](formatLog(message));
   };
 
   return {
+    getStdOut: () => stdOut,
+    setStdOut: (newStdOut: StdInterface) => (stdOut = newStdOut),
     getLogLevel: () => logLevel,
     setLogLevel: (newLogLevel: LogLevelType) => {
       logLevel = newLogLevel;
     },
+    getUserInfo: () => user,
+    setUser: (newUserInfo: TUser | null) => {
+      plugins.forEach((plugin) => {
+        plugin.setUser?.(newUserInfo);
+      });
+      user = newUserInfo;
+    },
+    getGlobalExtras: () => extras,
+    setGlobalExtras: (newGlobalExtras: TGlobalExtras) => {
+      plugins.forEach((plugin) => {
+        plugin.setGlobalExtras?.(newGlobalExtras);
+      });
+      extras = newGlobalExtras;
+    },
+    setTags: (tags: Record<string, string>) => {
+      plugins.forEach((plugin) => {
+        plugin.setTags?.(tags);
+      });
+    },
+
     debug: (...msgs: unknown[]) => {
-      logBasedOnLevel("debug", "DEBUG", msgs);
+      logBasedOnLevel({
+        logFunction: "log",
+        level: "debug",
+        params: msgs,
+      });
     },
     log: (...msgs: unknown[]) => {
-      logBasedOnLevel("log", "LOG", msgs);
+      logBasedOnLevel({
+        logFunction: "log",
+        level: "log",
+        params: msgs,
+      });
     },
     warn: (...msgs: unknown[]) => {
-      logBasedOnLevel("warn", "WARN", msgs);
-    },
-    error: (...msgs: unknown[]) => {
-      logBasedOnLevel("error", "ERROR", msgs);
-    },
-    async logPerformance<T>(
-      name: string,
-      promise: Promise<T>,
-    ): Promise<StdPerformanceResult> {
-      plugins.forEach((plugin) => {
-        plugin.logPerformance?.(name, promise);
+      logBasedOnLevel({
+        logFunction: "warn",
+        level: "warning",
+        params: msgs,
       });
-      const startTime = Date.now();
-      try {
-        const result = await promise;
-        const endTime = Date.now();
-        const elapsedTime = endTime - startTime;
-        return { time: elapsedTime, result };
-      } catch (error) {
-        const endTime = Date.now();
-        const elapsedTime = endTime - startTime;
-        return { time: elapsedTime, error };
-      }
+    },
+    error: <TCustomError>(
+      exception: TCustomError | Error,
+      ...msgs: unknown[]
+    ) => {
+      logBasedOnLevel({
+        logFunction: "error",
+        level: "error",
+        params: msgs,
+        exception,
+      });
     },
   };
 };

@@ -4,6 +4,12 @@ import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
 
 import { TRPCReactProvider } from "@/trpc/react";
+import { LoggerProvider } from "@/internals/LoggerProvider";
+import { getServerAuthSession } from "@/server/auth";
+import { api } from "@/trpc/server";
+import serverLogger from "@/internals/serverLogger";
+import Link from "next/link";
+import { HydrateClient } from "@/trpc/server";
 
 export const metadata: Metadata = {
   title: "Create T3 App",
@@ -11,13 +17,46 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const hello = await api.post.hello({ text: "from tRPC" });
+  const session = await getServerAuthSession();
+
+  void api.post.getLatest.prefetch();
+  session !== undefined && session !== null
+    ? serverLogger.setUser(session.user)
+    : serverLogger.setUser(null);
+
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
-        <TRPCReactProvider>{children}</TRPCReactProvider>
+        <main className="min-h-screen bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
+          <div className="flex justify-between py-4 px-4 w-full">
+            <h1 className="font-extrabold tracking-tight unmask-element sm:text-[2rem]">
+              <span className="text-[hsl(280,100%,70%)]">PEN-Gifts</span> App
+            </h1>
+            <div className="flex gap-4 justify-center items-center">
+              <p className="text-xl text-white">
+                {hello ? hello.greeting : "Loading tRPC query..."}
+              </p>
+              <p className="text-xl text-center text-white">
+                {session && <span>{session.user?.name}</span>}
+              </p>
+              <Link
+                href={session ? "/api/auth/signout" : "/api/auth/signin"}
+                className="py-3 px-10 font-semibold no-underline rounded-full transition bg-white/10 hover:bg-white/20"
+              >
+                {session ? "Sign out" : "Sign in"}
+              </Link>
+            </div>
+          </div>
+          <LoggerProvider>
+            <TRPCReactProvider>
+              <HydrateClient>{children} </HydrateClient>
+            </TRPCReactProvider>
+          </LoggerProvider>
+        </main>
       </body>
     </html>
   );
