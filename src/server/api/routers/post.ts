@@ -22,11 +22,11 @@ export const postRouter = createTRPCRouter({
       z.object({ name: z.string().min(1), description: z.string().min(1) }),
     )
     .mutation(async ({ ctx, input }) => {
-      throw new Error("ERROR NE ANH LJALKSJDLKAJWDLAKJD");
       const call = async () => {
         // simulate a slow db call
-        await new Promise((resolve) => setTimeout(resolve, 7000));
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
+        throw new Error("ERROR DURING CREATE POST");
         await ctx.db.insert(posts).values({
           name: input.name,
           description: input.description,

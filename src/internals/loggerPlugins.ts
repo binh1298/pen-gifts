@@ -17,7 +17,6 @@ const logFunction: StdPluginLogFunction<GlobalExtras> = ({
   params,
 }) => {
   Sentry.withScope((scope) => {
-    console.log("calling sentry", loglevel, exception);
     scope.setLevel(loglevel);
     if (exception) Sentry.captureException(exception);
     else Sentry.captureMessage(JSON.stringify(params));

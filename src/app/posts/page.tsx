@@ -22,22 +22,16 @@ export default function LatestPost() {
     },
     onError: (error) => {
       logger.error(error);
-      throw new Error("CCCKCJAHSKDJAWD");
     },
   });
   const deletePost = api.post.delete.useMutation({
     onSuccess: async () => {
       await utils.post.invalidate();
     },
+    onError: (error) => {
+      logger.error(error);
+    },
   });
-  console.log("Server call", deletePost.error);
-  if (deletePost.error) {
-    console.log("deletePost.error", deletePost.error);
-    logger.error(
-      new Error("678123498712349817234981723491827419287341298347987"),
-    );
-    Sentry.captureException(new Error("123"));
-  }
 
   return (
     <div className="w-full max-w-md">

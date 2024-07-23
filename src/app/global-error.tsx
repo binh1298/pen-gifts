@@ -11,7 +11,6 @@ export default function GlobalError({
 }) {
   const clientLogger = useLogger();
   useEffect(() => {
-    console.log("Global error", error);
     clientLogger.error(error);
   }, [clientLogger, error]);
 
