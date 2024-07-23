@@ -8,12 +8,11 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   environment: process.env.NEXT_PUBLIC_ENV,
-  // allowUrls: [process.env.SENTRY_ALLOW_URLS ?? "http://localhost:3000"],
-  release: process.env.NEXT_PUBLIC_ASSETS_CDN_VERSION ?? "local",
+  release: process.env.NEXT_PUBLIC_ASSETS_CDN_VERSION,
 
   // Adjust this value in production, or use tracesSampler for greater control
   tracesSampleRate: 1,
 
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
-  // debug: process.env.NEXT_PUBLIC_ENV === "development",
+  debug: false,
 });
